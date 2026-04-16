@@ -1459,6 +1459,15 @@ async function init(){
   }
 }
 init();
+
+// ── AUTO REFRESH (every 5 minutes) ────────────────────────────
+setInterval(async()=>{
+  if(!cfg.ep)return;
+  try{
+    await loadRemoteCfg();
+    await loadSheets();
+  }catch(e){}
+}, 5 * 60 * 1000);
 </script>
 </body>
 </html>
