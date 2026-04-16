@@ -1460,7 +1460,7 @@ async function init(){
 }
 init();
 
-// ── AUTO REFRESH (every 5 minutes) ────────────────────────────
+// 5 minute auto refresh
 setInterval(async()=>{
   if(!cfg.ep)return;
   try{
@@ -1468,6 +1468,22 @@ setInterval(async()=>{
     await loadSheets();
   }catch(e){}
 }, 5 * 60 * 1000);
+
+// iOS Safari fix
+document.addEventListener('visibilitychange',async()=>{
+  if(document.visibilityState==='visible'&&cfg.ep){
+    try{
+      await loadRemoteCfg();
+      await loadSheets();
+    }catch(e){}
+  }
+});
+
+window.addEventListener('pageshow',(e)=>{
+  if(e.persisted&&cfg.ep){
+    loadRemoteCfg().then(()=>loadSheets()).catch(()=>{});
+  }
+});
 </script>
 </body>
 </html>
