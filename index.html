@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Rajiv Main Portal</title>
+<title>Gurugram Block Portal</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -322,7 +322,7 @@ td{padding:9px 13px;vertical-align:middle}
 <div id="tab-submit" class="main">
 <div class="fw">
 <div class="card cp">
-  <div style="font-size:17px;font-weight:600;margin-bottom:3px" id="form-heading">Rajiv MAin Report</div>
+  <div style="font-size:17px;font-weight:600;margin-bottom:3px" id="form-heading">Submit Report</div>
   <div style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.5" id="form-subheading">Fill all required fields and submit your report.</div>
   <div id="form-steps" style="margin-bottom:20px"></div>
   <div id="form-body"></div>
@@ -579,10 +579,10 @@ function buildDef(){
   const clusters=Object.keys(SD),schools={};
   clusters.forEach(c=>{schools[c]=SD[c];});
   return {
-    ep:'https://script.google.com/macros/s/AKfycbxRacjdUzuDGocpX4sU2gSNigpi_4R8QDYWU4b-q_hRsqhdJqTmfGH27CC3FXBK-LCr8Q/exec',
-    pin:'1234',title:'Rajiv Main Portal',sub:'Cluster ',
-    logo:'CRC',dl:'Deadline: 25 Mar 2026 · 10:00 AM',dh:'Overall Submission Progress',
-    fh:'Quarterly School Safety Report',fs:'National DM Guidelines · Fill all required fields.',
+    ep:'https://script.google.com/macros/s/AKfycbwxtxwGwa-sO59dm_SOjW8RGTJFp4dtAtYO-IUmdXTVC3_eUwkfUb2ZkU_sXyhynXTj1g/exec',
+    pin:'1234',title:'Rajiv Main Portal',sub:'BEO Gurugram · Haryana',
+    logo:'DEO',dl:'Deadline: 25 Mar 2026 · 10:00 AM',dh:'Overall Submission Progress',
+    fh:'Submit Report',fs:'Fill all required fields.',
     clusters,schools,disabledCats:[],
     sections:JSON.parse(JSON.stringify(DEF_SECTIONS))
   };
@@ -863,7 +863,7 @@ function expStatus(){
   const h=['School','Category','Cluster','Status','Submitted By','Submitted At'];
   const rows=[h];
   allSch().forEach(x=>{const s=subs[x.school];rows.push([x.school,x.category,x.cluster,s?'Submitted':'Pending',s?Object.values(s.fields||{})[0]||'':'',s?s.time||'':'']);});
-  dlCSV(rows,'QPR_Status.csv');
+  dlCSV(rows,'Status.csv');
 }
 function expFull(){
   const allF=allSch().filter(x=>subs[x.school]);
@@ -879,7 +879,7 @@ function expFull(){
     const gv=gActs.flatMap(a=>gRws.map(r=>s.gridData?.[a]?.[r]??''));
     rows.push([x.school,x.category,x.cluster,s.time||'',...fv,...gv]);
   });
-  dlCSV(rows,'QPR_FullData.csv');
+  dlCSV(rows,'FullData.csv');
 }
 function dlCSV(rows,name){
   const a=document.createElement('a');
