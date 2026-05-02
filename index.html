@@ -906,8 +906,9 @@ function getSelSchoolCat(){
   return '';
 }
 function secVisible(sec,cat){
-  if(!sec.routeFor||sec.routeFor==='')return true;
-  return sec.routeFor===cat;
+  if(!sec.routeFor||sec.routeFor===''||(Array.isArray(sec.routeFor)&&sec.routeFor.length===0))return true;
+  if(Array.isArray(sec.routeFor))return sec.routeFor.includes(cat);
+  return sec.routeFor===cat; // backwards compat
 }
 function visibleSecs(){
   const cat=getSelSchoolCat();
@@ -1290,13 +1291,16 @@ function rFB(){
         <div style="flex:1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
           <input value="${esc(sec.title||'')}" placeholder="Section Title" oninput="cfg.sections[${si}].title=this.value;rFormSteps();rFormSection()" style="padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:13px;font-family:inherit;outline:none;width:100%">
           <input value="${esc(sec.description||'')}" placeholder="Description (optional)" oninput="cfg.sections[${si}].description=this.value;rFormSection()" style="padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:13px;font-family:inherit;outline:none;width:100%">
-          <select title="Show this section only for selected school type" onchange="cfg.sections[${si}].routeFor=this.value;rFormSteps();rFormSection()" style="padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:12px;font-family:inherit;outline:none;width:100%;cursor:pointer">
-            <option value="" ${!sec.routeFor?'selected':''} style="background:#1e293b">🔀 Show for All Schools</option>
-            <option value="Primary" ${sec.routeFor==='Primary'?'selected':''} style="background:#1e293b">📗 Primary only</option>
-            <option value="Middle" ${sec.routeFor==='Middle'?'selected':''} style="background:#1e293b">📘 Middle only</option>
-            <option value="High" ${sec.routeFor==='High'?'selected':''} style="background:#1e293b">📙 High only</option>
-            <option value="Sr. Sec." ${sec.routeFor==='Sr. Sec.'?'selected':''} style="background:#1e293b">📕 Sr. Secondary only</option>
-          </select>
+          <div style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:6px 10px;font-size:11px;color:#cbd5e1">
+            <div style="margin-bottom:4px;font-weight:600;color:#94a3b8">🔀 Show for school types:</div>
+            ${['Primary','Middle','High','Sr. Sec.'].map(cat=>{
+              const rf=Array.isArray(sec.routeFor)?sec.routeFor:(sec.routeFor?[sec.routeFor]:[]);
+              const chk=rf.length===0||rf.includes(cat)?'checked':'';
+              return `<label style="display:inline-flex;align-items:center;gap:4px;margin-right:8px;cursor:pointer;color:#e2e8f0">
+                <input type="checkbox" ${chk} onchange="(function(el,s,c){const rf=Array.isArray(cfg.sections[s].routeFor)?cfg.sections[s].routeFor:(cfg.sections[s].routeFor?[cfg.sections[s].routeFor]:[]);const all=['Primary','Middle','High','Sr. Sec.'];if(rf.length===0){cfg.sections[s].routeFor=all.filter(x=>x!==c);}else if(el.checked){if(!rf.includes(c))rf.push(c);cfg.sections[s].routeFor=rf;}else{cfg.sections[s].routeFor=rf.filter(x=>x!==c);}if(cfg.sections[s].routeFor.length===4)cfg.sections[s].routeFor=[];rFormSteps();rFormSection();})(this,${si},'${cat}')" style="accent-color:#818cf8">${cat}</label>`;
+            }).join('')}
+            <div style="margin-top:4px;font-size:10px;color:#64748b">${(()=>{const rf=Array.isArray(sec.routeFor)?sec.routeFor:(sec.routeFor?[sec.routeFor]:[]);return rf.length===0?'All schools see this section':'Only: '+rf.join(', ');})()} </div>
+          </div>
         </div>
         <div style="display:flex;gap:4px;flex-shrink:0">
           ${si>0?`<button class="shbtn" onclick="fbMoveSec(${si},-1)">↑</button>`:''}
