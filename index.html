@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Rajiv Main Portal</title>
+<title>Gurugram Block Portal</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -322,7 +322,7 @@ td{padding:9px 13px;vertical-align:middle}
 <div id="tab-submit" class="main">
 <div class="fw">
 <div class="card cp">
-  <div style="font-size:17px;font-weight:600;margin-bottom:3px" id="form-heading">Rajiv MAin Report</div>
+  <div style="font-size:17px;font-weight:600;margin-bottom:3px" id="form-heading">Submit Report</div>
   <div style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.5" id="form-subheading">Fill all required fields and submit your report.</div>
   <div id="form-steps" style="margin-bottom:20px"></div>
   <div id="form-body"></div>
@@ -579,10 +579,10 @@ function buildDef(){
   const clusters=Object.keys(SD),schools={};
   clusters.forEach(c=>{schools[c]=SD[c];});
   return {
-    ep:'https://script.google.com/macros/s/AKfycbzR6USEiqd5_PvcTtVXVTwOEhF4fUpG-QtD_MpxlkX6Wml0XFvJfzxVIo86Yo2lX7fxvg/exec',
-    pin:'1234',title:'Rajiv Main Portal',sub:'Cluster ',
-    logo:'CRC',dl:'Deadline: 25 Mar 2026 · 10:00 AM',dh:'Overall Submission Progress',
-    fh:'Quarterly School Safety Report',fs:'National DM Guidelines · Fill all required fields.',
+    ep:'https://script.google.com/macros/s/AKfycbwxtxwGwa-sO59dm_SOjW8RGTJFp4dtAtYO-IUmdXTVC3_eUwkfUb2ZkU_sXyhynXTj1g/exec',
+    pin:'1234',title:'Rajiv Main Portal',sub:'BEO Gurugram · Haryana',
+    logo:'DEO',dl:'Deadline: 25 Mar 2026 · 10:00 AM',dh:'Overall Submission Progress',
+    fh:'Submit Report',fs:'National DM Guidelines · Fill all required fields.',
     clusters,schools,disabledCats:[],
     sections:JSON.parse(JSON.stringify(DEF_SECTIONS))
   };
@@ -863,7 +863,7 @@ function expStatus(){
   const h=['School','Category','Cluster','Status','Submitted By','Submitted At'];
   const rows=[h];
   allSch().forEach(x=>{const s=subs[x.school];rows.push([x.school,x.category,x.cluster,s?'Submitted':'Pending',s?Object.values(s.fields||{})[0]||'':'',s?s.time||'':'']);});
-  dlCSV(rows,'QPR_Status.csv');
+  dlCSV(rows,'Status.csv');
 }
 function expFull(){
   const allF=allSch().filter(x=>subs[x.school]);
@@ -879,7 +879,7 @@ function expFull(){
     const gv=gActs.flatMap(a=>gRws.map(r=>s.gridData?.[a]?.[r]??''));
     rows.push([x.school,x.category,x.cluster,s.time||'',...fv,...gv]);
   });
-  dlCSV(rows,'QPR_FullData.csv');
+  dlCSV(rows,'FullData.csv');
 }
 function dlCSV(rows,name){
   const a=document.createElement('a');
@@ -890,19 +890,45 @@ function dlCSV(rows,name){
 // ══════════════════════════════════════════════════════════════
 // FORM ENGINE — renders sections, updates live from form builder
 // ══════════════════════════════════════════════════════════════
+// ── ROUTING HELPERS ───────────────────────────────────────────
+function getSelSchoolCat(){
+  for(const sec of(cfg.sections||[])){
+    const clf=sec.fields.find(f=>f.type==='cluster_select');
+    const schf=sec.fields.find(f=>f.type==='school_select');
+    if(schf&&fdata[schf.id]){
+      const cluster=clf?fdata[clf.id]||'':'';
+      if(cluster&&cfg.schools[cluster]){
+        const found=cfg.schools[cluster].find(s=>(typeof s==='object'?s.name:s)===fdata[schf.id]);
+        if(found&&found.category)return found.category;
+      }
+    }
+  }
+  return '';
+}
+function secVisible(sec,cat){
+  if(!sec.routeFor||sec.routeFor==='')return true;
+  return sec.routeFor===cat;
+}
+function visibleSecs(){
+  const cat=getSelSchoolCat();
+  return (cfg.sections||[]).map((_,i)=>i).filter(i=>secVisible(cfg.sections[i],cat));
+}
+
 function rFormSteps(){
   const secs=cfg.sections||[];
   const wrap=document.getElementById('form-steps');if(!wrap)return;
-  if(secs.length<=1){wrap.innerHTML='';return;}
+  const vis=visibleSecs();
+  if(vis.length<=1){wrap.innerHTML='';return;}
   let h='<div class="steps">';
-  secs.forEach((sec,i)=>{
-    const done=i<curSec,active=i===curSec;
+  vis.forEach((si,vi)=>{
+    const sec=secs[si];
+    const done=si<curSec,active=si===curSec;
     const dc=done?'done':active?'active':'todo';
     h+=`<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-      <div class="sdot ${dc}">${done?'✓':i+1}</div>
-      <div class="slbl2" style="color:${done?'var(--green)':active?'var(--navy)':'var(--light)'}">${esc(sec.title||'Section '+(i+1))}</div>
+      <div class="sdot ${dc}">${done?'✓':vi+1}</div>
+      <div class="slbl2" style="color:${done?'var(--green)':active?'var(--navy)':'var(--light)'}">${esc(sec.title||'Section '+(vi+1))}</div>
     </div>`;
-    if(i<secs.length-1)h+=`<div class="sline" style="background:${i<curSec?'var(--green)':'var(--border)'}"></div>`;
+    if(vi<vis.length-1)h+=`<div class="sline" style="background:${si<curSec?'var(--green)':'var(--border)'}"></div>`;
   });
   h+='</div>';
   wrap.innerHTML=h;
@@ -1032,6 +1058,7 @@ function populateFormSchool(){
 function onSchSel(fid){
   const el=document.getElementById('ff_'+fid);if(!el)return;
   fdata[fid]=el.value;
+  rFormSteps(); // update step bar based on school category
   const disp=document.getElementById('cat-disp-'+fid),val=document.getElementById('cat-val-'+fid);
   if(!disp||!val)return;
   const sec=cfg.sections[curSec];const clf=sec?.fields.find(f=>f.type==='cluster_select');
@@ -1068,12 +1095,22 @@ function fNext(){
     if(f.type==='tel'&&v&&!/^[0-9]{7,15}$/.test(v.replace(/\s/g,''))){showE('Enter a valid phone number.');return;}
   }
   saveSecData();
-  curSec++;
+  // Smart routing: skip sections not matching the selected school's category
+  const cat=getSelSchoolCat();
+  let next=curSec+1;
+  while(next<cfg.sections.length&&!secVisible(cfg.sections[next],cat))next++;
+  curSec=next;
   rFormSteps();rFormSection();
   document.getElementById('tab-submit').scrollIntoView({behavior:'smooth'});
 }
 function fBack(){
-  saveSecData();curSec--;rFormSteps();rFormSection();
+  saveSecData();
+  // Smart routing: skip sections not matching the selected school's category
+  const cat=getSelSchoolCat();
+  let prev=curSec-1;
+  while(prev>0&&!secVisible(cfg.sections[prev],cat))prev--;
+  curSec=prev;
+  rFormSteps();rFormSection();
   document.getElementById('tab-submit').scrollIntoView({behavior:'smooth'});
 }
 function fClear(){fdata={};uploads={};driveLinks={};curSec=0;rFormSteps();rFormSection();}
@@ -1250,9 +1287,16 @@ function rFB(){
     card.innerHTML=`
       <div class="sec-hdr">
         <span style="color:#94a3b8;font-size:11px;font-weight:600;flex-shrink:0">SEC ${si+1}</span>
-        <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="flex:1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
           <input value="${esc(sec.title||'')}" placeholder="Section Title" oninput="cfg.sections[${si}].title=this.value;rFormSteps();rFormSection()" style="padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:13px;font-family:inherit;outline:none;width:100%">
           <input value="${esc(sec.description||'')}" placeholder="Description (optional)" oninput="cfg.sections[${si}].description=this.value;rFormSection()" style="padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:13px;font-family:inherit;outline:none;width:100%">
+          <select title="Show this section only for selected school type" onchange="cfg.sections[${si}].routeFor=this.value;rFormSteps();rFormSection()" style="padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:12px;font-family:inherit;outline:none;width:100%;cursor:pointer">
+            <option value="" ${!sec.routeFor?'selected':''} style="background:#1e293b">🔀 Show for All Schools</option>
+            <option value="Primary" ${sec.routeFor==='Primary'?'selected':''} style="background:#1e293b">📗 Primary only</option>
+            <option value="Middle" ${sec.routeFor==='Middle'?'selected':''} style="background:#1e293b">📘 Middle only</option>
+            <option value="High" ${sec.routeFor==='High'?'selected':''} style="background:#1e293b">📙 High only</option>
+            <option value="Sr. Sec." ${sec.routeFor==='Sr. Sec.'?'selected':''} style="background:#1e293b">📕 Sr. Secondary only</option>
+          </select>
         </div>
         <div style="display:flex;gap:4px;flex-shrink:0">
           ${si>0?`<button class="shbtn" onclick="fbMoveSec(${si},-1)">↑</button>`:''}
@@ -1460,30 +1504,22 @@ async function init(){
 }
 init();
 
-// 5 minute auto refresh
+// ── AUTO REFRESH (every 5 minutes) ────────────────────────────
 setInterval(async()=>{
   if(!cfg.ep)return;
-  try{
-    await loadRemoteCfg();
-    await loadSheets();
-  }catch(e){}
+  try{await loadRemoteCfg();await loadSheets();}catch(e){}
 }, 5 * 60 * 1000);
 
-// iOS Safari fix
+// ── iOS SAFARI FIX ────────────────────────────────────────────
 document.addEventListener('visibilitychange',async()=>{
   if(document.visibilityState==='visible'&&cfg.ep){
-    try{
-      await loadRemoteCfg();
-      await loadSheets();
-    }catch(e){}
+    try{await loadRemoteCfg();await loadSheets();}catch(e){}
   }
+});
+window.addEventListener('pageshow',(e)=>{
+  if(e.persisted&&cfg.ep){loadRemoteCfg().then(()=>loadSheets()).catch(()=>{});}
 });
 
-window.addEventListener('pageshow',(e)=>{
-  if(e.persisted&&cfg.ep){
-    loadRemoteCfg().then(()=>loadSheets()).catch(()=>{});
-  }
-});
 </script>
 </body>
 </html>
