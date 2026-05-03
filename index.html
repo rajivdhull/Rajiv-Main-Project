@@ -890,50 +890,54 @@ function dlCSV(rows,name){
 // ══════════════════════════════════════════════════════════════
 // FORM ENGINE — renders sections, updates live from form builder
 // ══════════════════════════════════════════════════════════════
-// ── ROUTING HELPERS ───────────────────────────────────────────
-function getSelSchoolCat(){
-  for(const sec of(cfg.sections||[])){
-    const clf=sec.fields.find(f=>f.type==='cluster_select');
-    const schf=sec.fields.find(f=>f.type==='school_select');
-    if(schf&&fdata[schf.id]){
-      const cluster=clf?fdata[clf.id]||'':'';
-      if(cluster&&cfg.schools[cluster]){
-        const found=cfg.schools[cluster].find(s=>(typeof s==='object'?s.name:s)===fdata[schf.id]);
-        if(found&&found.category)return found.category;
-      }
+// ── ROUTING HELPERS (Google Forms style) ──────────────────────
+// Resolve which section index to go to after fromSec.
+// Priority: select-field answer route → section afterSection → next
+function resolveNextSec(fromSec){
+  const sec=cfg.sections[fromSec];
+  if(!sec)return fromSec+1;
+  for(const f of(sec.fields||[])){
+    if(f.type==='select'&&f.optionRoutes){
+      const val=fdata[f.id];
+      if(val&&f.optionRoutes[val])return routeTarget(f.optionRoutes[val],fromSec);
     }
   }
-  return '';
+  if(sec.afterSection&&sec.afterSection!=='next')return routeTarget(sec.afterSection,fromSec);
+  return fromSec+1;
 }
-function secVisible(sec,cat){
-  if(!sec.routeFor||sec.routeFor===''||(Array.isArray(sec.routeFor)&&sec.routeFor.length===0))return true;
-  if(Array.isArray(sec.routeFor))return sec.routeFor.includes(cat);
-  return sec.routeFor===cat; // backwards compat
+function routeTarget(route,fromSec){
+  if(route==='submit')return 9999;
+  if(route&&route.startsWith('si_'))return parseInt(route.slice(3));
+  return fromSec+1;
 }
-function visibleSecs(){
-  const cat=getSelSchoolCat();
-  return (cfg.sections||[]).map((_,i)=>i).filter(i=>secVisible(cfg.sections[i],cat));
+function secRouteOpts(currentSi,forAfter){
+  const secs=cfg.sections||[];
+  let h='<option value="next">▶ Continue to next section</option>';
+  secs.forEach((s,si)=>{
+    if(forAfter&&si===currentSi)return;
+    h+=`<option value="si_${si}">→ Section ${si+1}: ${esc(s.title||'Untitled')}</option>`;
+  });
+  h+='<option value="submit">✅ Submit form</option>';
+  return h;
 }
-
 function rFormSteps(){
   const secs=cfg.sections||[];
   const wrap=document.getElementById('form-steps');if(!wrap)return;
-  const vis=visibleSecs();
-  if(vis.length<=1){wrap.innerHTML='';return;}
+  if(secs.length<=1){wrap.innerHTML='';return;}
   let h='<div class="steps">';
-  vis.forEach((si,vi)=>{
-    const sec=secs[si];
-    const done=si<curSec,active=si===curSec;
+  secs.forEach((sec,i)=>{
+    const done=i<curSec,active=i===curSec;
     const dc=done?'done':active?'active':'todo';
     h+=`<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-      <div class="sdot ${dc}">${done?'✓':vi+1}</div>
-      <div class="slbl2" style="color:${done?'var(--green)':active?'var(--navy)':'var(--light)'}">${esc(sec.title||'Section '+(vi+1))}</div>
+      <div class="sdot ${dc}">${done?'✓':i+1}</div>
+      <div class="slbl2" style="color:${done?'var(--green)':active?'var(--navy)':'var(--light)'}">${esc(sec.title||'Section '+(i+1))}</div>
     </div>`;
-    if(vi<vis.length-1)h+=`<div class="sline" style="background:${si<curSec?'var(--green)':'var(--border)'}"></div>`;
+    if(i<secs.length-1)h+=`<div class="sline" style="background:${i<curSec?'var(--green)':'var(--border)'}"></div>`;
   });
   h+='</div>';
   wrap.innerHTML=h;
 }
+
 
 function rFormSection(){
   const secs=cfg.sections||[];
