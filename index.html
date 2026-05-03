@@ -942,7 +942,7 @@ function rFormSection(){
     return;
   }
   const sec=secs[curSec];
-  const isLast=curSec===secs.length-1;
+  const nextIdx=resolveNextSec(curSec);const isLast=nextIdx===9999||nextIdx>=secs.length;
   const isFirst=curSec===0;
 
   let h='';
@@ -1059,7 +1059,6 @@ function populateFormSchool(){
 function onSchSel(fid){
   const el=document.getElementById('ff_'+fid);if(!el)return;
   fdata[fid]=el.value;
-  rFormSteps(); // update step bar based on school category
   const disp=document.getElementById('cat-disp-'+fid),val=document.getElementById('cat-val-'+fid);
   if(!disp||!val)return;
   const sec=cfg.sections[curSec];const clf=sec?.fields.find(f=>f.type==='cluster_select');
@@ -1096,21 +1095,18 @@ function fNext(){
     if(f.type==='tel'&&v&&!/^[0-9]{7,15}$/.test(v.replace(/\s/g,''))){showE('Enter a valid phone number.');return;}
   }
   saveSecData();
-  // Smart routing: skip sections not matching the selected school's category
-  const cat=getSelSchoolCat();
-  let next=curSec+1;
-  while(next<cfg.sections.length&&!secVisible(cfg.sections[next],cat))next++;
-  curSec=next;
+  const nextIdx=resolveNextSec(curSec);
+  if(nextIdx===9999||nextIdx>=cfg.sections.length){
+    // Route says submit — trigger submit directly
+    fSubmit();return;
+  }
+  curSec=nextIdx;
   rFormSteps();rFormSection();
   document.getElementById('tab-submit').scrollIntoView({behavior:'smooth'});
 }
 function fBack(){
   saveSecData();
-  // Smart routing: skip sections not matching the selected school's category
-  const cat=getSelSchoolCat();
-  let prev=curSec-1;
-  while(prev>0&&!secVisible(cfg.sections[prev],cat))prev--;
-  curSec=prev;
+  curSec=Math.max(0,curSec-1);
   rFormSteps();rFormSection();
   document.getElementById('tab-submit').scrollIntoView({behavior:'smooth'});
 }
@@ -1284,35 +1280,40 @@ function rFB(){
   if(!cfg.sections)cfg.sections=JSON.parse(JSON.stringify(DEF_SECTIONS));
   list.innerHTML='';
   cfg.sections.forEach((sec,si)=>{
-    const card=document.createElement('div');card.className='sec-card';
+    const isLast=si===cfg.sections.length-1;
+    const card=document.createElement('div');
+    card.className='sec-card';
+    card.style.cssText='border:2px solid #e2e8f0;border-radius:12px;margin-bottom:18px;overflow:hidden;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.06)';
     card.innerHTML=`
-      <div class="sec-hdr">
-        <span style="color:#94a3b8;font-size:11px;font-weight:600;flex-shrink:0">SEC ${si+1}</span>
-        <div style="flex:1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-          <input value="${esc(sec.title||'')}" placeholder="Section Title" oninput="cfg.sections[${si}].title=this.value;rFormSteps();rFormSection()" style="padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:13px;font-family:inherit;outline:none;width:100%">
-          <input value="${esc(sec.description||'')}" placeholder="Description (optional)" oninput="cfg.sections[${si}].description=this.value;rFormSection()" style="padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:13px;font-family:inherit;outline:none;width:100%">
-          <div style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:6px 10px;font-size:11px;color:#cbd5e1">
-            <div style="margin-bottom:4px;font-weight:600;color:#94a3b8">🔀 Show for school types:</div>
-            ${['Primary','Middle','High','Sr. Sec.'].map(cat=>{
-              const rf=Array.isArray(sec.routeFor)?sec.routeFor:(sec.routeFor?[sec.routeFor]:[]);
-              const chk=rf.length===0||rf.includes(cat)?'checked':'';
-              return `<label style="display:inline-flex;align-items:center;gap:4px;margin-right:8px;cursor:pointer;color:#e2e8f0">
-                <input type="checkbox" ${chk} onchange="(function(el,s,c){const rf=Array.isArray(cfg.sections[s].routeFor)?cfg.sections[s].routeFor:(cfg.sections[s].routeFor?[cfg.sections[s].routeFor]:[]);const all=['Primary','Middle','High','Sr. Sec.'];if(rf.length===0){cfg.sections[s].routeFor=all.filter(x=>x!==c);}else if(el.checked){if(!rf.includes(c))rf.push(c);cfg.sections[s].routeFor=rf;}else{cfg.sections[s].routeFor=rf.filter(x=>x!==c);}if(cfg.sections[s].routeFor.length===4)cfg.sections[s].routeFor=[];rFormSteps();rFormSection();})(this,${si},'${cat}')" style="accent-color:#818cf8">${cat}</label>`;
-            }).join('')}
-            <div style="margin-top:4px;font-size:10px;color:#64748b">${(()=>{const rf=Array.isArray(sec.routeFor)?sec.routeFor:(sec.routeFor?[sec.routeFor]:[]);return rf.length===0?'All schools see this section':'Only: '+rf.join(', ');})()} </div>
-          </div>
+      <!-- Section Header Bar -->
+      <div style="background:linear-gradient(135deg,#1e3a5f,#2563eb);padding:12px 16px;display:flex;align-items:center;gap:10px">
+        <div style="background:rgba(255,255,255,.2);color:#fff;font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;flex-shrink:0">SEC ${si+1}</div>
+        <div style="flex:1;display:flex;gap:8px">
+          <input value="${esc(sec.title||'')}" placeholder="Section Title" oninput="cfg.sections[${si}].title=this.value;rFormSteps();rFormSection()" style="flex:1;padding:6px 10px;border-radius:6px;border:none;background:rgba(255,255,255,.15);color:#fff;font-size:13px;font-weight:600;font-family:inherit;outline:none" title="Section title">
+          <input value="${esc(sec.description||'')}" placeholder="Section description (optional)" oninput="cfg.sections[${si}].description=this.value;rFormSection()" style="flex:1.5;padding:6px 10px;border-radius:6px;border:none;background:rgba(255,255,255,.1);color:#e2e8f0;font-size:12px;font-family:inherit;outline:none" title="Description shown to user">
         </div>
         <div style="display:flex;gap:4px;flex-shrink:0">
-          ${si>0?`<button class="shbtn" onclick="fbMoveSec(${si},-1)">↑</button>`:''}
-          ${si<cfg.sections.length-1?`<button class="shbtn" onclick="fbMoveSec(${si},1)">↓</button>`:''}
-          <button class="shbtn del" onclick="fbDelSec(${si})">×</button>
+          ${si>0?`<button title="Move section up" onclick="fbMoveSec(${si},-1)" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px">↑</button>`:''}
+          ${!isLast?`<button title="Move section down" onclick="fbMoveSec(${si},1)" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px">↓</button>`:''}
+          <button title="Duplicate section" onclick="fbDupSec(${si})" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:13px">⧉</button>
+          ${cfg.sections.length>1?`<button title="Delete section" onclick="fbDelSec(${si})" style="background:rgba(220,38,38,.5);color:#fff;border:none;border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:16px;font-weight:bold">×</button>`:''}
         </div>
       </div>
-      <div id="fb-flds-${si}"></div>
-      <div class="sec-footer">
-        <input id="fb-nl-${si}" placeholder="Field label..." onkeydown="if(event.key==='Enter')fbAddFld(${si})">
-        <select id="fb-nt-${si}">${Object.entries(FT).map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select>
-        <button onclick="fbAddFld(${si})">+ Add Field</button>
+      <!-- Fields list -->
+      <div id="fb-flds-${si}" style="padding:0 16px"></div>
+      <!-- Add field row -->
+      <div style="padding:10px 16px;background:#f8fafc;border-top:1px solid #e2e8f0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input id="fb-nl-${si}" placeholder="New question label..." onkeydown="if(event.key==='Enter')fbAddFld(${si})" style="flex:1;min-width:160px;padding:7px 10px;border:1px solid #cbd5e1;border-radius:7px;font-size:13px;font-family:inherit;outline:none">
+        <select id="fb-nt-${si}" style="padding:7px 10px;border:1px solid #cbd5e1;border-radius:7px;font-size:13px;font-family:inherit;outline:none;background:#fff">${Object.entries(FT).map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select>
+        <button onclick="fbAddFld(${si})" style="padding:7px 14px;background:#2563eb;color:#fff;border:none;border-radius:7px;font-size:13px;cursor:pointer;font-weight:500">+ Add Question</button>
+      </div>
+      <!-- After-section routing -->
+      <div style="padding:10px 16px;background:#f0f4ff;border-top:1px dashed #c7d2fe;display:flex;align-items:center;gap:10px">
+        <span style="font-size:11px;font-weight:600;color:#6366f1;white-space:nowrap">⬇ After Section ${si+1}:</span>
+        <select onchange="cfg.sections[${si}].afterSection=this.value;rFormSection()" style="flex:1;padding:6px 10px;border:1px solid #c7d2fe;border-radius:7px;font-size:12px;font-family:inherit;outline:none;background:#fff;color:#1e293b">
+          ${secRouteOpts(si,true).replace(`value="${sec.afterSection||'next'}"`,`value="${sec.afterSection||'next'}" selected`)}
+        </select>
+        <span style="font-size:10px;color:#94a3b8;flex-shrink:0">Section-level routing</span>
       </div>`;
     list.appendChild(card);
     rFBFields(si);
@@ -1323,65 +1324,88 @@ function rFBFields(si){
   const wrap=document.getElementById('fb-flds-'+si);if(!wrap)return;
   const sec=cfg.sections[si];wrap.innerHTML='';
   if(!sec.fields||!sec.fields.length){
-    wrap.innerHTML='<div style="padding:10px 14px;font-size:12px;color:var(--light);font-style:italic">No fields. Add below.</div>';
+    wrap.innerHTML='<div style="padding:14px 0;font-size:12px;color:#94a3b8;font-style:italic;text-align:center">No questions yet. Add one below.</div>';
     return;
   }
   sec.fields.forEach((f,fi)=>{
-    const div=document.createElement('div');div.className='fld-row';
-    // Extra settings for special types
+    const div=document.createElement('div');
+    div.style.cssText='border:1px solid #e2e8f0;border-radius:10px;margin:12px 0;background:#fff;overflow:hidden;transition:box-shadow .2s';
     let extra='';
     if(f.type==='datagrid'){
-      extra=`<div class="fld-extra">
-        <div class="fld-extra-title">Columns (Activities)</div>
+      extra=`<div style="padding:10px 14px;background:#f8fafc;border-top:1px solid #f1f5f9">
+        <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">📊 Grid Columns</div>
         <div id="fb-cols-${si}-${fi}"></div>
-        <div class="add-item-row">
-          <input id="fb-nc-${si}-${fi}" placeholder="Column name...">
-          <select id="fb-nct-${si}-${fi}">${['number','text','url','yesno','date'].map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
-          <button onclick="fbAddCol(${si},${fi})">+ Column</button>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <input id="fb-nc-${si}-${fi}" placeholder="Column name..." style="flex:1;padding:5px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;font-family:inherit;outline:none">
+          <select id="fb-nct-${si}-${fi}" style="padding:5px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;font-family:inherit;outline:none">${['number','text','url','yesno','date'].map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
+          <button onclick="fbAddCol(${si},${fi})" style="padding:5px 10px;background:#0f172a;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">+ Col</button>
         </div>
-        <div class="fld-extra-title" style="margin-top:10px">Rows</div>
+        <div style="font-size:11px;font-weight:700;color:#64748b;margin:10px 0 6px;text-transform:uppercase;letter-spacing:.5px">📋 Grid Rows</div>
         <div id="fb-rows-${si}-${fi}"></div>
-        <div class="add-item-row">
-          <input id="fb-nr-${si}-${fi}" placeholder="Row name...">
-          <select id="fb-nrt-${si}-${fi}">${['number','text','url','yesno','date'].map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
-          <button onclick="fbAddRow(${si},${fi})">+ Row</button>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <input id="fb-nr-${si}-${fi}" placeholder="Row name..." style="flex:1;padding:5px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;font-family:inherit;outline:none">
+          <select id="fb-nrt-${si}-${fi}" style="padding:5px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;font-family:inherit;outline:none">${['number','text','url','yesno','date'].map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
+          <button onclick="fbAddRow(${si},${fi})" style="padding:5px 10px;background:#0f172a;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">+ Row</button>
         </div>
       </div>`;
     }
     if(f.type==='select'){
-      extra=`<div class="fld-extra">
-        <div class="fld-extra-title">Options (comma separated)</div>
-        <input value="${esc((f.options||[]).join(', '))}" placeholder="Option A, Option B, Option C" oninput="cfg.sections[${si}].fields[${fi}].options=this.value.split(',').map(s=>s.trim()).filter(Boolean);rFormSection()" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;outline:none">
+      // Google Forms style: each option as a row with its own route
+      const opts=f.options||[];
+      extra=`<div style="padding:10px 14px;background:#f8fafc;border-top:1px solid #f1f5f9">
+        <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">📌 Options & Go-to-Section routing</div>
+        <div id="fb-opts-${si}-${fi}">${opts.map((opt,oi)=>`
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <span style="color:#94a3b8;font-size:11px;width:16px;text-align:right">${oi+1}.</span>
+            <input value="${esc(opt)}" oninput="cfg.sections[${si}].fields[${fi}].options[${oi}]=this.value;rFBFields(${si});rFormSection()" placeholder="Option ${oi+1}" style="flex:1;padding:5px 9px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;font-family:inherit;outline:none">
+            <select onchange="if(!cfg.sections[${si}].fields[${fi}].optionRoutes)cfg.sections[${si}].fields[${fi}].optionRoutes={};cfg.sections[${si}].fields[${fi}].optionRoutes[cfg.sections[${si}].fields[${fi}].options[${oi}]||this.dataset.opt]=this.value;rFormSection()" title="If user selects this option, go to..." style="width:190px;padding:5px 8px;border:1px solid #c7d2fe;border-radius:6px;font-size:11px;font-family:inherit;outline:none;background:#fff;color:#3730a3">
+              ${secRouteOpts(si,false).replace(`value="${(f.optionRoutes&&f.optionRoutes[opt])||'next'}"`,`value="${(f.optionRoutes&&f.optionRoutes[opt])||'next'}" selected`)}
+            </select>
+            <button onclick="cfg.sections[${si}].fields[${fi}].options.splice(${oi},1);if(cfg.sections[${si}].fields[${fi}].optionRoutes)delete cfg.sections[${si}].fields[${fi}].optionRoutes['${esc(opt)}'];rFBFields(${si});rFormSection()" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:16px;padding:0 4px" title="Remove option">×</button>
+          </div>`).join('')}</div>
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <input id="fb-nopt-${si}-${fi}" placeholder="Add option..." onkeydown="if(event.key==='Enter')fbAddOpt(${si},${fi})" style="flex:1;padding:5px 9px;border:1px dashed #c7d2fe;border-radius:6px;font-size:12px;font-family:inherit;outline:none;background:#fafafa">
+          <button onclick="fbAddOpt(${si},${fi})" style="padding:5px 12px;background:#6366f1;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">+ Option</button>
+        </div>
+        <div style="margin-top:6px;font-size:10px;color:#94a3b8">💡 Set "Go to" per option to route users to different sections (like Google Forms)</div>
       </div>`;
     }
     if(f.type==='file'){
-      extra=`<div class="fld-extra">
+      extra=`<div style="padding:10px 14px;background:#f8fafc;border-top:1px solid #f1f5f9">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-          <div><div class="fld-extra-title">Max Files</div><input type="number" min="1" max="10" value="${f.maxFiles||1}" oninput="cfg.sections[${si}].fields[${fi}].maxFiles=parseInt(this.value)||1;rFormSection()" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;outline:none"></div>
-          <div><div class="fld-extra-title">Max MB</div><input type="number" min="1" max="100" value="${f.maxSizeMB||10}" oninput="cfg.sections[${si}].fields[${fi}].maxSizeMB=parseInt(this.value)||10;rFormSection()" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;outline:none"></div>
-          <div><div class="fld-extra-title">File Types</div>
-            <select oninput="cfg.sections[${si}].fields[${fi}].allowedTypes=this.value;rFormSection()" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;outline:none">
+          <div><div style="font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px">Max Files</div><input type="number" min="1" max="10" value="${f.maxFiles||1}" oninput="cfg.sections[${si}].fields[${fi}].maxFiles=parseInt(this.value)||1;rFormSection()" style="width:100%;padding:5px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;font-family:inherit;outline:none"></div>
+          <div><div style="font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px">Max MB</div><input type="number" min="1" max="30" value="${f.maxSizeMB||10}" oninput="cfg.sections[${si}].fields[${fi}].maxSizeMB=parseInt(this.value)||10;rFormSection()" style="width:100%;padding:5px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;font-family:inherit;outline:none"></div>
+          <div><div style="font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px">File Types</div>
+            <select oninput="cfg.sections[${si}].fields[${fi}].allowedTypes=this.value;rFormSection()" style="width:100%;padding:5px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;font-family:inherit;outline:none">
               ${['any','image','pdf','doc','image,pdf'].map(t=>`<option value="${t}"${f.allowedTypes===t?' selected':''}>${t==='any'?'Any':t==='image'?'Images':t==='pdf'?'PDF':t==='doc'?'Word/Excel/PPT':'Images+PDF'}</option>`).join('')}
             </select></div>
         </div>
       </div>`;
     }
-    div.innerHTML=`<div class="fld-num">${fi+1}</div>
-      <div class="fld-main">
-        <div class="fld-ctrl">
-          <input type="text" value="${esc(f.label)}" placeholder="Field label" oninput="cfg.sections[${si}].fields[${fi}].label=this.value;rFormSection()">
-          <select oninput="cfg.sections[${si}].fields[${fi}].type=this.value;rFBFields(${si});rFormSection()">
-            ${Object.entries(FT).map(([v,l])=>`<option value="${v}"${f.type===v?' selected':''}>${l}</option>`).join('')}
-          </select>
-          <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);cursor:pointer;white-space:nowrap">
-            <input type="checkbox" ${f.required?'checked':''} onchange="cfg.sections[${si}].fields[${fi}].required=this.checked;rFormSection()"> Required
-          </label>
-          ${fi>0?`<button class="fcbtn" onclick="fbMoveFld(${si},${fi},-1);rFormSection()" title="Move up">↑</button>`:''}
-          ${fi<sec.fields.length-1?`<button class="fcbtn" onclick="fbMoveFld(${si},${fi},1);rFormSection()" title="Move down">↓</button>`:''}
-          <button class="fcbtn del" onclick="fbDelFld(${si},${fi});rFormSection()" title="Delete">×</button>
+    div.innerHTML=`
+      <!-- Question top bar -->
+      <div style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;background:#fff">
+        <div style="color:#94a3b8;font-size:12px;font-weight:700;padding-top:8px;width:20px;flex-shrink:0;text-align:right">${fi+1}</div>
+        <div style="flex:1">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input type="text" value="${esc(f.label)}" placeholder="Question label" oninput="cfg.sections[${si}].fields[${fi}].label=this.value;rFormSection()" style="flex:1;min-width:180px;padding:7px 10px;border:1px solid #e2e8f0;border-radius:7px;font-size:13px;font-family:inherit;outline:none;font-weight:500">
+            <select oninput="cfg.sections[${si}].fields[${fi}].type=this.value;if(this.value==='select'&&!cfg.sections[${si}].fields[${fi}].options)cfg.sections[${si}].fields[${fi}].options=[];rFBFields(${si});rFormSection()" style="padding:7px 10px;border:1px solid #e2e8f0;border-radius:7px;font-size:12px;font-family:inherit;outline:none;background:#fff">
+              ${Object.entries(FT).map(([v,l])=>`<option value="${v}"${f.type===v?' selected':''}>${l}</option>`).join('')}
+            </select>
+            <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#475569;cursor:pointer;white-space:nowrap;padding:4px 8px;border:1px solid #e2e8f0;border-radius:7px">
+              <input type="checkbox" ${f.required?'checked':''} onchange="cfg.sections[${si}].fields[${fi}].required=this.checked;rFormSection()" style="accent-color:#2563eb"> Required
+            </label>
+          </div>
         </div>
-        ${extra}
-      </div>`;
+        <!-- Move / duplicate / delete -->
+        <div style="display:flex;gap:3px;flex-shrink:0;padding-top:2px">
+          ${fi>0?`<button title="Move up" onclick="fbMoveFld(${si},${fi},-1);rFormSection()" style="background:#f1f5f9;border:none;border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:13px">↑</button>`:''}
+          ${fi<sec.fields.length-1?`<button title="Move down" onclick="fbMoveFld(${si},${fi},1);rFormSection()" style="background:#f1f5f9;border:none;border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:13px">↓</button>`:''}
+          <button title="Duplicate question" onclick="fbDupFld(${si},${fi})" style="background:#f1f5f9;border:none;border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:12px">⧉</button>
+          <button title="Delete question" onclick="fbDelFld(${si},${fi});rFormSection()" style="background:#fee2e2;border:none;border-radius:6px;width:26px;height:26px;cursor:pointer;color:#dc2626;font-size:16px;font-weight:bold">×</button>
+        </div>
+      </div>
+      ${extra}`;
     wrap.appendChild(div);
     if(f.type==='datagrid'){rFBCols(si,fi);rFBRows(si,fi);}
   });
@@ -1389,29 +1413,33 @@ function rFBFields(si){
 function rFBCols(si,fi){
   const w=document.getElementById(`fb-cols-${si}-${fi}`);if(!w)return;
   const cols=(cfg.sections[si].fields[fi].columns||[]);
-  w.innerHTML=cols.map((c,ci)=>`<div class="grid-row">
-    <input value="${esc(c.label||c)}" oninput="if(!cfg.sections[${si}].fields[${fi}].columns[${ci}].label)cfg.sections[${si}].fields[${fi}].columns[${ci}]={label:this.value,type:'number'};else cfg.sections[${si}].fields[${fi}].columns[${ci}].label=this.value;rFormSection()">
-    <select oninput="cfg.sections[${si}].fields[${fi}].columns[${ci}].type=this.value;rFormSection()">${['number','text','url','yesno','date'].map(t=>`<option value="${t}"${(c.type||'number')===t?' selected':''}>${t}</option>`).join('')}</select>
-    <button class="x" onclick="cfg.sections[${si}].fields[${fi}].columns.splice(${ci},1);rFBCols(${si},${fi});rFormSection()">×</button>
+  w.innerHTML=cols.map((c,ci)=>`<div style="display:flex;gap:6px;margin-bottom:5px">
+    <input value="${esc(c.label||c)}" oninput="if(!cfg.sections[${si}].fields[${fi}].columns[${ci}].label)cfg.sections[${si}].fields[${fi}].columns[${ci}]={label:this.value,type:'number'};else cfg.sections[${si}].fields[${fi}].columns[${ci}].label=this.value;rFormSection()" style="flex:1;padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;font-family:inherit;outline:none">
+    <select oninput="cfg.sections[${si}].fields[${fi}].columns[${ci}].type=this.value;rFormSection()" style="padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;font-family:inherit;outline:none">${['number','text','url','yesno','date'].map(t=>`<option value="${t}"${(c.type||'number')===t?' selected':''}>${t}</option>`).join('')}</select>
+    <button onclick="cfg.sections[${si}].fields[${fi}].columns.splice(${ci},1);rFBCols(${si},${fi});rFormSection()" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:16px;padding:0 4px">×</button>
   </div>`).join('');
 }
 function rFBRows(si,fi){
   const w=document.getElementById(`fb-rows-${si}-${fi}`);if(!w)return;
   const rows=(cfg.sections[si].fields[fi].rows||[]);
-  w.innerHTML=rows.map((r,ri)=>`<div class="grid-row">
-    <input value="${esc(r.label||r)}" oninput="if(!cfg.sections[${si}].fields[${fi}].rows[${ri}].label)cfg.sections[${si}].fields[${fi}].rows[${ri}]={label:this.value,type:'number'};else cfg.sections[${si}].fields[${fi}].rows[${ri}].label=this.value;rFormSection()">
-    <select oninput="cfg.sections[${si}].fields[${fi}].rows[${ri}].type=this.value;rFormSection()">${['number','text','url','yesno','date'].map(t=>`<option value="${t}"${(r.type||'number')===t?' selected':''}>${t}</option>`).join('')}</select>
-    <button class="x" onclick="cfg.sections[${si}].fields[${fi}].rows.splice(${ri},1);rFBRows(${si},${fi});rFormSection()">×</button>
+  w.innerHTML=rows.map((r,ri)=>`<div style="display:flex;gap:6px;margin-bottom:5px">
+    <input value="${esc(r.label||r)}" oninput="if(!cfg.sections[${si}].fields[${fi}].rows[${ri}].label)cfg.sections[${si}].fields[${fi}].rows[${ri}]={label:this.value,type:'number'};else cfg.sections[${si}].fields[${fi}].rows[${ri}].label=this.value;rFormSection()" style="flex:1;padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;font-family:inherit;outline:none">
+    <select oninput="cfg.sections[${si}].fields[${fi}].rows[${ri}].type=this.value;rFormSection()" style="padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;font-family:inherit;outline:none">${['number','text','url','yesno','date'].map(t=>`<option value="${t}"${(r.type||'number')===t?' selected':''}>${t}</option>`).join('')}</select>
+    <button onclick="cfg.sections[${si}].fields[${fi}].rows.splice(${ri},1);rFBRows(${si},${fi});rFormSection()" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:16px;padding:0 4px">×</button>
   </div>`).join('');
 }
 function fbAddCol(si,fi){const v=document.getElementById(`fb-nc-${si}-${fi}`).value.trim();if(!v)return;const t=document.getElementById(`fb-nct-${si}-${fi}`).value;if(!cfg.sections[si].fields[fi].columns)cfg.sections[si].fields[fi].columns=[];cfg.sections[si].fields[fi].columns.push({label:v,type:t});document.getElementById(`fb-nc-${si}-${fi}`).value='';rFBCols(si,fi);rFormSection();}
 function fbAddRow(si,fi){const v=document.getElementById(`fb-nr-${si}-${fi}`).value.trim();if(!v)return;const t=document.getElementById(`fb-nrt-${si}-${fi}`).value;if(!cfg.sections[si].fields[fi].rows)cfg.sections[si].fields[fi].rows=[];cfg.sections[si].fields[fi].rows.push({label:v,type:t});document.getElementById(`fb-nr-${si}-${fi}`).value='';rFBRows(si,fi);rFormSection();}
-function fbAddSec(){if(!cfg.sections)cfg.sections=[];cfg.sections.push({id:uid(),title:'New Section',description:'',fields:[]});rFB();rFormSteps();}
-function fbDelSec(si){if(!confirm(`Delete Section ${si+1}?`))return;cfg.sections.splice(si,1);rFB();rFormSteps();rFormSection();}
+function fbAddOpt(si,fi){const inp=document.getElementById(`fb-nopt-${si}-${fi}`);const v=inp.value.trim();if(!v)return;if(!cfg.sections[si].fields[fi].options)cfg.sections[si].fields[fi].options=[];cfg.sections[si].fields[fi].options.push(v);inp.value='';rFBFields(si);rFormSection();}
+function fbAddSec(){if(!cfg.sections)cfg.sections=[];cfg.sections.push({id:uid(),title:'New Section',description:'',afterSection:'next',fields:[]});rFB();rFormSteps();}
+function fbDelSec(si){if(!confirm(`Delete Section ${si+1} and all its questions?`))return;cfg.sections.splice(si,1);rFB();rFormSteps();rFormSection();}
 function fbMoveSec(si,d){const a=cfg.sections,j=si+d;if(j<0||j>=a.length)return;[a[si],a[j]]=[a[j],a[si]];rFB();rFormSteps();rFormSection();}
-function fbAddFld(si){const v=document.getElementById('fb-nl-'+si).value.trim();if(!v)return;const t=document.getElementById('fb-nt-'+si).value;const f={id:uid(),label:v,type:t,required:false};if(t==='select')f.options=[];if(t==='file'){f.maxFiles=1;f.maxSizeMB=10;f.allowedTypes='any';}if(t==='datagrid'){f.columns=[];f.rows=[];}cfg.sections[si].fields.push(f);document.getElementById('fb-nl-'+si).value='';rFBFields(si);rFormSection();}
+function fbDupSec(si){const copy=JSON.parse(JSON.stringify(cfg.sections[si]));copy.id=uid();copy.title+=' (Copy)';copy.fields=copy.fields.map(f=>({...f,id:uid()}));cfg.sections.splice(si+1,0,copy);rFB();rFormSteps();}
+function fbAddFld(si){const v=document.getElementById('fb-nl-'+si).value.trim();if(!v)return;const t=document.getElementById('fb-nt-'+si).value;const f={id:uid(),label:v,type:t,required:false};if(t==='select'){f.options=[];f.optionRoutes={};}if(t==='file'){f.maxFiles=1;f.maxSizeMB=10;f.allowedTypes='any';}if(t==='datagrid'){f.columns=[];f.rows=[];}cfg.sections[si].fields.push(f);document.getElementById('fb-nl-'+si).value='';rFBFields(si);rFormSection();}
 function fbDelFld(si,fi){cfg.sections[si].fields.splice(fi,1);rFBFields(si);}
 function fbMoveFld(si,fi,d){const a=cfg.sections[si].fields,j=fi+d;if(j<0||j>=a.length)return;[a[fi],a[j]]=[a[j],a[fi]];rFBFields(si);}
+function fbDupFld(si,fi){const copy=JSON.parse(JSON.stringify(cfg.sections[si].fields[fi]));copy.id=uid();copy.label+=' (Copy)';cfg.sections[si].fields.splice(fi+1,0,copy);rFBFields(si);rFormSection();}
+
 
 // ── MASTER NAV ─────────────────────────────────────────────────
 function showMS(id,el){
