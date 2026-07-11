@@ -580,15 +580,15 @@ function buildDef(){
   clusters.forEach(c=>{schools[c]=SD[c];});
   return {
     ep:'https://script.google.com/macros/s/AKfycbwD4QDekdOCrFV9ASbWXgGD7PfGFXDkk1_C3R_BvCioSoiSgWGtj4fhDE12hewCkwCqew/exec',
-    pin:'1234',title:'School Gurugram Data Portal',sub:'BEO Gurugram · Haryana',
-    logo:'BEO',dl:'Deadline: 25 Mar 2026 · 10:00 AM',dh:'Overall Submission Progress',
-    fh:'Gurugram Block Data Portal',fs:'National DM Guidelines · Fill all required fields.',
+    pin:'1234',title:'School Safety QPR Portal',sub:'DEO Gurugram · Haryana',
+    logo:'DEO',dl:'Deadline: 25 Mar 2026 · 10:00 AM',dh:'Overall Submission Progress',
+    fh:'Quarterly School Safety Report',fs:'National DM Guidelines · Fill all required fields.',
     clusters,schools,disabledCats:[],
     sections:JSON.parse(JSON.stringify(DEF_SECTIONS))
   };
 }
 
-let cfg=buildDef(), subs={}, curSec=0, fdata={}, uploads={}, driveLinks={}, submitting=false;
+let cfg=buildDef(), subs={}, curSec=0, fdata={}, uploads={}, driveLinks={}, submitting=false, gridState={};
 let selCl=null, isAdmin=false, dashF='all', dashCl='';
 
 function lcfg(){try{const c=localStorage.getItem(CK);if(c){const p=JSON.parse(c);Object.assign(cfg,p);if(!cfg.sections||!cfg.sections.length)cfg.sections=JSON.parse(JSON.stringify(DEF_SECTIONS));}}catch(e){}}
@@ -986,11 +986,12 @@ function buildFieldHtml(f){
       tbl+=`<tr><td class="rlbl">${esc(rl)}<div style="font-size:9px;color:var(--light)">${TL[rt]||''}</div></td>`;
       cols.forEach((_,ci)=>{
         const cid=`ff_${f.id}_${ri}_${ci}`;
-        if(rt==='yesno')tbl+=`<td><select id="${cid}" style="width:100%;padding:6px;border:none;font-size:12px;font-family:inherit;background:transparent;outline:none"><option value="">—</option><option>Yes</option><option>No</option></select></td>`;
-        else if(rt==='url')tbl+=`<td><input type="url" id="${cid}" placeholder="https://..." style="width:100%;padding:7px 8px;border:none;font-size:11px;font-family:inherit;background:transparent;outline:none;color:var(--blue)"></td>`;
-        else if(rt==='date')tbl+=`<td><input type="date" id="${cid}" style="width:100%;padding:6px;border:none;font-size:11px;font-family:inherit;background:transparent;outline:none"></td>`;
-        else if(rt==='number')tbl+=`<td><input type="number" min="0" id="${cid}" placeholder="0" style="width:100%;padding:7px 8px;border:none;font-size:12px;font-family:inherit;background:transparent;outline:none"></td>`;
-        else tbl+=`<td><input type="text" id="${cid}" placeholder="—" style="width:100%;padding:7px 8px;border:none;font-size:12px;font-family:inherit;background:transparent;outline:none"></td>`;
+        const gv=(gridState['${f.id}']||{})[ri]?.[ci]||'';
+        if(rt==='yesno')tbl+=`<td><select id="${cid}" onchange="saveGV('${f.id}',${ri},${ci},this.value)" style="width:100%;padding:6px;border:none;font-size:12px;font-family:inherit;background:transparent;outline:none"><option value="">—</option><option${gv==='Yes'?' selected':''}>Yes</option><option${gv==='No'?' selected':''}>No</option></select></td>`;
+        else if(rt==='url')tbl+=`<td><input type="url" id="${cid}" value="${gv}" oninput="saveGV('${f.id}',${ri},${ci},this.value)" placeholder="https://..." style="width:100%;padding:7px 8px;border:none;font-size:11px;font-family:inherit;background:transparent;outline:none;color:var(--blue)"></td>`;
+        else if(rt==='date')tbl+=`<td><input type="date" id="${cid}" value="${gv}" oninput="saveGV('${f.id}',${ri},${ci},this.value)" style="width:100%;padding:6px;border:none;font-size:11px;font-family:inherit;background:transparent;outline:none"></td>`;
+        else if(rt==='number')tbl+=`<td><input type="number" min="0" id="${cid}" value="${gv}" oninput="saveGV('${f.id}',${ri},${ci},this.value)" placeholder="0" style="width:100%;padding:7px 8px;border:none;font-size:12px;font-family:inherit;background:transparent;outline:none"></td>`;
+        else tbl+=`<td><input type="text" id="${cid}" value="${gv}" oninput="saveGV('${f.id}',${ri},${ci},this.value)" placeholder="—" style="width:100%;padding:7px 8px;border:none;font-size:12px;font-family:inherit;background:transparent;outline:none"></td>`;
       });
       tbl+=`</tr>`;
     });
@@ -1076,7 +1077,12 @@ function fBack(){
   saveSecData();curSec--;rFormSteps();rFormSection();
   document.getElementById('tab-submit').scrollIntoView({behavior:'smooth'});
 }
-function fClear(){fdata={};uploads={};driveLinks={};curSec=0;rFormSteps();rFormSection();}
+function saveGV(fid,ri,ci,val){
+  if(!gridState[fid])gridState[fid]={};
+  if(!gridState[fid][ri])gridState[fid][ri]={};
+  gridState[fid][ri][ci]=val;
+}
+function fClear(){fdata={};uploads={};driveLinks={};gridState={};curSec=0;rFormSteps();rFormSection();}
 function showE(m){const el=document.getElementById('ferr');if(!el)return;el.textContent=m;el.style.display='block';setTimeout(()=>el.style.display='none',4500);}
 
 // ── FILE UPLOAD ───────────────────────────────────────────────
@@ -1201,12 +1207,12 @@ async function submitForm(){
       else if(f.type==='school_select')school=fdata[f.id]||'';
       else if(f.type==='datagrid'){
         const cols=f.columns||[];const rows=f.rows||[];
+        // Read from gridState (persists across section navigation) not DOM
         cols.forEach((col,ci)=>{
           const cl=`${f.label} » ${col.label||col}`;gridData[cl]={};
           rows.forEach((row,ri)=>{
             const rl=row.label||row;
-            const el=document.getElementById(`ff_${f.id}_${ri}_${ci}`);
-            gridData[cl][rl]=el?el.value.trim():'';
+            gridData[cl][rl]=(gridState[f.id]?.[ri]?.[ci])||'';
           });
         });
       }else if(f.type!=='file'){fields[f.label]=fdata[f.id]||'';}
